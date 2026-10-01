@@ -1,0 +1,12 @@
+import { cp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+await rm(new URL('../dist',import.meta.url),{recursive:true,force:true});
+await mkdir(new URL('../dist',import.meta.url),{recursive:true});
+await cp(new URL('../index.html',import.meta.url),new URL('../dist/index.html',import.meta.url));
+await cp(new URL('../src',import.meta.url),new URL('../dist/src',import.meta.url),{recursive:true});
+await cp(new URL('../public',import.meta.url),new URL('../dist',import.meta.url),{recursive:true});
+const hash=createHash('sha256');
+for(const file of ['index.html','src/app.js','src/core.js','src/catalog.js','src/storage.js','src/styles.css','public/sw.js','public/manifest.webmanifest'])hash.update(await readFile(new URL('../'+file,import.meta.url)));
+const version=hash.digest('hex').slice(0,12),sw=await readFile(new URL('../dist/sw.js',import.meta.url),'utf8');
+await writeFile(new URL('../dist/sw.js',import.meta.url),sw.replace('a-little-less-v1',`a-little-less-${version}`));
+console.log('Built static PWA in dist/');
