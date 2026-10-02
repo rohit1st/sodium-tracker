@@ -29,7 +29,7 @@ test('local calendar dates handle month boundaries and leap years',()=>{assert.e
 test('backup round trip, incompatible and malformed backups',()=>{
   const state=freshState();addEntry(state,localDate(),{name:'Eggs',mg:140,meal:'Breakfast'});const restored=validateBackup(JSON.parse(JSON.stringify(state)));assert.equal(summary(restored.days[localDate()]).total,140);
   assert.throws(()=>validateBackup({...state,schema:3}));assert.throws(()=>validateBackup({...state,goal:-1}));assert.throws(()=>validateBackup({...state,days:{bad:{entries:[],goal:2000}}}));
-  const bad=structuredClone(state);bad.days[localDate()].entries[0].mg=null;assert.throws(()=>validateBackup(bad));
+  const bad=structuredClone(state);bad.days[localDate()].entries[0].mg=-1;assert.throws(()=>validateBackup(bad));
 });
 test('atomic storage detects another tab and storage errors leave old data intact',()=>{
   const map=new Map(),storage={getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v)};let a=loadState(storage),b=loadState(storage);a=writeState(a,a.revision,storage);assert.throws(()=>writeState(b,b.revision,storage),/another tab/);b=loadState(storage);assert.equal(a.revision,b.revision);

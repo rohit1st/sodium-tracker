@@ -6,7 +6,7 @@ await cp(new URL('../index.html',import.meta.url),new URL('../dist/index.html',i
 await cp(new URL('../src',import.meta.url),new URL('../dist/src',import.meta.url),{recursive:true});
 await cp(new URL('../public',import.meta.url),new URL('../dist',import.meta.url),{recursive:true});
 const hash=createHash('sha256');
-for(const file of ['index.html','src/app.js','src/core.js','src/catalog.js','src/storage.js','src/styles.css','public/sw.js','public/manifest.webmanifest'])hash.update(await readFile(new URL('../'+file,import.meta.url)));
+for(const file of ['index.html','src/app.js','src/core.js','src/catalog.js','src/storage.js','src/styles.css','public/sw.js','public/manifest.webmanifest','public/icons/icon-192.png','public/icons/icon-512.png','public/icons/maskable-512.png','public/icons/apple-touch-icon.png','public/icons/orange-touch-icon.png'])hash.update(await readFile(new URL('../'+file,import.meta.url)));
 const version=hash.digest('hex').slice(0,12),sw=await readFile(new URL('../dist/sw.js',import.meta.url),'utf8');
 await writeFile(new URL('../dist/sw.js',import.meta.url),sw.replace('a-little-less-v1',`a-little-less-${version}`));
 console.log('Built static PWA in dist/');
