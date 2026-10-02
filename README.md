@@ -71,3 +71,13 @@ After a production update, use Settings → Refresh data → Update app when off
 Version 2 automatically reads original sodium backups without inventing protein or carb values. Existing users are invited to choose their primary focus. If an old iPhone shortcut displays a letter, open the updated HTTPS site in Safari and add it to Home Screen again; iOS may retain the icon of an existing shortcut. Test installation on the actual device after deployment.
 
 Version 2 browser checks additionally covered protein-first onboarding and reload, the optional install invitation, package and regular portion math for all three nutrients, preserving fields on meal changes, different calendar rewards for the same day, missing-data handling, recipe draft persistence, and 393×759 / 393×852 / 440×956 viewports. The app icon is linked as a dedicated 180px PNG; actual iPhone Home Screen installation remains a device check after HTTPS deployment.
+
+## Reusable food library
+
+Quick Add → Regulars starts with 12 editable foods, ranked by mealtime. Search, tap a food, and scale its named portion. Starter nutrition is an estimate from [Health Canada's 2008 common-food reference](https://www.canada.ca/en/health-canada/services/food-nutrition/healthy-eating/nutrient-data/nutrient-value-some-common-foods-2008.html); check current labels and additions.
+
+Open **Settings → Food list** (or **Manage food list** in Quick Add) to add, edit, remove, export or import foods. Adding/editing a library food never changes past logs. Tracking reset keeps the library. Old accounts receive starter foods and their saved regulars during migration.
+
+Food-list JSON exports have `type: "meal-tracker-food-list"`, `version: 1`, fixed `units: {sodium: "mg", protein: "g", carbs: "g"}`, and a `foods` array. Each food has `name`, a named `portion`, preferred `meal`, `mg` (sodium), `protein`, `carbs`, `estimate`, `source`, and optional HTTPS `sourceUrl`. Missing nutrients are `null`; zero means known zero. No logs, goals, dates, private notes, recipe allocations or device IDs are exported.
+
+Import previews a merge, skipping matches by case-insensitive name/portion and nutrient amounts. Different portions or nutrition remain separate. Imports never overwrite logs or goals. Up to 1,000 foods and 2 MB per file; malformed lists reject as a whole. Full personal backups are a separate format and include the library along with private tracking data.

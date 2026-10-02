@@ -1,3 +1,4 @@
+import { STARTER_FOODS } from './starter-foods.js';
 export const MEALS = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
 export const SCHEMA = 2;
 export const NUTRIENTS = {
@@ -14,11 +15,11 @@ export function nutrientAmounts(values,amount=1,mode='servings',container=1) {
 }
 export function sortedRegulars(state,meal) {
   const entries=Object.values(state.days).flatMap(d=>d.entries).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-  const all=[...state.favorites,...entries], key=e=>JSON.stringify([e.name,e.mg,e.protein??null,e.carbs??null]);
+  const all=[...(state.foods||[]),...entries], key=e=>JSON.stringify([e.name,e.portion||e.quantityLabel||"",e.mg,e.protein??null,e.carbs??null]);
   return all.filter((e,i,a)=>a.findIndex(v=>key(v)===key(e))===i).sort((a,b)=>{
     const score=e=>entries.filter(v=>v.name===e.name&&v.meal===meal).length*10+(e.meal===meal?100:0)+(state.favorites.some(v=>v.name===e.name)?5:0);
     return score(b)-score(a);
-  }).slice(0,30);
+  });
 }
 export function currentMeal(hour=new Date().getHours()) { return hour<11?'Breakfast':hour<16?'Lunch':'Dinner'; }
 
@@ -49,7 +50,7 @@ export function dateObject(s) { const [y,m,d] = s.split('-').map(Number); return
 export function shiftDate(s,n) { const d = dateObject(s); d.setDate(d.getDate()+n); return localDate(d); }
 export function id() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 export function freshState(goal = 2000) {
-  return { schema:SCHEMA, revision:'', goal, goals:{sodium:goal,protein:null,carbs:null}, primary:'sodium', onboarded:false, days:{}, batches:[], favorites:[], draft:null, preferences:{ theme:'system', vegetarian:false, reserve:0 } };
+  return { schema:SCHEMA, revision:'', goal, goals:{sodium:goal,protein:null,carbs:null}, primary:'sodium', onboarded:false, days:{}, batches:[], favorites:[], foods:structuredClone(STARTER_FOODS), draft:null, preferences:{ theme:'system', vegetarian:false, reserve:0 } };
 }
 export function dayFor(state,date) { return state.days[date] || { goal:state.goal, goals:{...state.goals}, entries:[], complete:false, plan:null }; }
 export function totalFor(day,key='sodium') { return round(day.entries.reduce((sum,e)=>sum+(nutrientValue(e,key)??0),0)); }
@@ -153,9 +154,45 @@ export function validateBackup(data) {
   if(!Array.isArray(data.batches)||!Array.isArray(data.favorites))throw new Error('Missing recipe data.');
   clean.batches=data.batches.map(b=>{if(!b||typeof b.id!=='string'||typeof b.name!=='string'||!b.name.trim()||!validDate(b.date))throw new Error('Invalid batch.');numeric(b.yield,'Batch portions',{min:.001});const ingredients=validateIngredients(b.ingredients);batchTotal(ingredients);return {...b,yield:numeric(b.yield),ingredients};});
   clean.favorites=data.favorites.map(e=>{validateEntry(e);return {...e};});
+  clean.foods=data.foods===undefined?mergeFoods(structuredClone(STARTER_FOODS),clean.favorites.map(foodFromEntry)).foods:validateFoods(data.foods);
   clean.draft=null;clean.preferences={...clean.preferences,...data.preferences};
   if(!['system','light','dark'].includes(clean.preferences.theme))clean.preferences.theme='system';
   clean.preferences.reserve=numeric(clean.preferences.reserve,'Reserve',{max:100000});
   clean.preferences.vegetarian=Boolean(clean.preferences.vegetarian);
   return clean;
+}
+
+// Food-list exchange deliberately allowlists fields. Logs, dates, goals, batch IDs,
+// consumption frequency, and other state must never enter a shared food file.
+export function cleanFood(value,{keepId=false}={}) {
+  if(!value||typeof value!=='object')throw new Error('Invalid food item.');
+  const text=(key,max,required=false)=>{const v=value[key];if(v==null&&!required)return '';if(typeof v!=='string'||v.length>max||required&&!v.trim())throw new Error(`Invalid food ${key}.`);return v.trim();};
+  const name=text('name',250,true),portion=text('portion',120,true),source=text('source',240),sourceUrl=text('sourceUrl',1000);
+  if(!MEALS.includes(value.meal))throw new Error('Each food needs a meal: Breakfast, Lunch, Dinner or Snacks.');
+  if(sourceUrl){let url;try{url=new URL(sourceUrl);}catch{throw new Error('Invalid food source link.');}if(url.protocol!=='https:'||url.username||url.password)throw new Error('Food source links must use HTTPS without credentials.');}
+  if(value.estimate!==undefined&&typeof value.estimate!=='boolean')throw new Error('Food estimate must be true or false.');
+  const food={name,portion,meal:value.meal,...nutrientAmounts(value),estimate:value.estimate!==false,source,sourceUrl};
+  if(keepId)food.id=typeof value.id==='string'&&value.id.length<=100?value.id:id();
+  return food;
+}
+export function foodFromEntry(entry){return cleanFood({...entry,portion:entry.portion||entry.quantityLabel||'1 saved portion'});}
+export function foodKey(food){return JSON.stringify([food.name.trim().toLowerCase(),food.portion.trim().toLowerCase(),food.mg,food.protein,food.carbs]);}
+export function validateFoods(foods){
+  if(!Array.isArray(foods)||foods.length>1000)throw new Error('A food list can contain up to 1,000 foods.');
+  const clean=foods.map(f=>cleanFood(f,{keepId:true}));
+  if(new Set(clean.map(f=>f.id)).size!==clean.length)throw new Error('Duplicate food IDs.');
+  return clean;
+}
+export function exportFoodList(foods){return {type:'meal-tracker-food-list',version:1,units:{sodium:'mg',protein:'g',carbs:'g'},foods:validateFoods(foods).map(f=>cleanFood(f))};}
+export function importFoodList(data){
+  if(data?.type!=='meal-tracker-food-list'||data.version!==1||data.units?.sodium!=='mg'||data.units?.protein!=='g'||data.units?.carbs!=='g')throw new Error('Choose a Meal Tracker food-list file. Personal backups belong in Import backup.');
+  if(data.days||data.goals||data.batches)throw new Error('This file includes personal tracking data. Use a food-list export instead.');
+  if(!Array.isArray(data.foods)||data.foods.length>1000)throw new Error('A food list can contain up to 1,000 foods.');
+  return data.foods.map(f=>({...cleanFood(f),id:id()}));
+}
+export function mergeFoods(existing,incoming){
+  const foods=validateFoods(existing),keys=new Set(foods.map(foodKey));let added=0,skipped=0;
+  for(const item of incoming){const food=cleanFood(item),key=foodKey(food);if(keys.has(key)){skipped++;continue;}keys.add(key);foods.push({...food,id:id()});added++;}
+  if(foods.length>1000)throw new Error('The merged library would exceed 1,000 foods.');
+  return {foods,added,skipped};
 }
