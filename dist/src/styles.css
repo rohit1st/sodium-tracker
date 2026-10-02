@@ -26,3 +26,5 @@ dialog{border:1px solid var(--line);border-radius:26px;padding:0;background:var(
 /* Feedback stays clear of the thumb-reachable Add and Finish actions. */
 .toast{top:calc(env(safe-area-inset-top,0px) + 64px);bottom:auto}
 body:has(dialog[open]) .toast{top:auto;bottom:18px}
+
+.goal-field > p{margin:6px 0 16px;line-height:1.45}
