@@ -14,3 +14,15 @@ dialog{border:1px solid var(--line);border-radius:26px;padding:0;background:var(
 @media(max-width:360px){.app-header{padding-left:17px;padding-right:17px}main{padding-left:17px;padding-right:17px}h1{font-size:28px}.date-controls .icon-button{width:24px}.allowance-top{font-size:12px}.allowance{padding-left:17px;padding-right:17px}.tabs button{font-size:10px}.calendar-grid,.weekdays{margin-left:-10px;margin-right:-10px}.calendar-grid{gap:1px}.ingredient-row .icon-button{width:28px}.tiny-pill{font-size:9px}}
 @media(min-width:600px){#app{box-shadow:0 0 70px #6b321016;border-left:1px solid var(--line);border-right:1px solid var(--line)}.app-header{padding-top:20px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+/* Nutrient goals and the shorter quick-add flow. */
+.goal-tabs{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:4px;background:var(--soft);padding:4px;border-radius:14px;margin:10px 0 12px;flex-shrink:0}
+.goal-tabs button{background:transparent;border:0;min-height:36px;padding:7px 4px;font-size:12px}.goal-tabs .selected{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px var(--shadow)}
+.today-view .goal-tabs{margin:8px 0 0}.today-view .allowance{margin-top:12px}.protein-allowance .meter span{background:#50754a}.protein-allowance{background:#e1e9bc;color:#293b25}.protein-allowance .tiny-pill{border-color:#4d703544}
+.nutrient-fields{border:0;padding:0;margin:17px 0 0;min-width:0}.nutrient-fields legend{font-size:12px;color:var(--muted)}.nutrient-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.nutrient-grid label{font-size:11px;margin-top:4px}.nutrient-grid input{padding:10px 8px}.nutrient-fields>p{margin:8px 0 0;font-size:11px}
+.nutrient-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px 0}.nutrient-strip span{display:block;font-size:11px;color:var(--muted)}.nutrient-strip strong{display:block;font-size:15px;font-weight:500;margin-top:3px;overflow-wrap:anywhere}.quick-meal{display:flex;align-items:center;gap:12px;margin-top:12px}.quick-meal select{flex:1;margin:0}.install-orange{display:block;border-radius:20px;margin:5px auto 20px}
+@media(max-height:800px){.today-view .allowance{margin-top:9px;margin-bottom:12px}.today-view .goal-tabs{margin-top:3px}.today-view .goal-tabs button{min-height:32px}.today-view .day-end{min-height:75px}.today-view .allowance-number{font-size:46px}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .protein-allowance{background:#354730;color:#f1f5db}}
+:root[data-theme=dark] .protein-allowance{background:#354730;color:#f1f5db}
+/* Feedback stays clear of the thumb-reachable Add and Finish actions. */
+.toast{top:calc(env(safe-area-inset-top,0px) + 64px);bottom:auto}
+body:has(dialog[open]) .toast{top:auto;bottom:18px}

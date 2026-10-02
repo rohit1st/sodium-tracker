@@ -1,5 +1,27 @@
 export const MEALS = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
-export const SCHEMA = 1;
+export const SCHEMA = 2;
+export const NUTRIENTS = {
+  sodium:{label:'Sodium / salt',short:'Sodium',unit:'mg',direction:'limit'},
+  protein:{label:'Protein',short:'Protein',unit:'g',direction:'target'},
+  carbs:{label:'Carbs',short:'Carbs',unit:'g',direction:'limit'}
+};
+export const nutrientKeys=Object.keys(NUTRIENTS);
+export function optionalNumber(value,label='Amount') { return value==null||typeof value==='string'&&!value.trim()?null:numeric(value,label); }
+export function nutrientValue(entry,key='sodium') { return optionalNumber(key==='sodium'?(entry.mg??entry.sodium):entry[key]); }
+export function nutrientAmounts(values,amount=1,mode='servings',container=1) {
+  const factor=numeric(amount,'Portions',{min:.001})*(mode==='containers'?numeric(container,'Servings per container',{min:.001}):1);
+  return Object.fromEntries(nutrientKeys.map(k=>{const v=nutrientValue(values,k);return [k==='sodium'?'mg':k,v===null?null:round(v*factor)];}));
+}
+export function sortedRegulars(state,meal) {
+  const entries=Object.values(state.days).flatMap(d=>d.entries).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const all=[...state.favorites,...entries], key=e=>JSON.stringify([e.name,e.mg,e.protein??null,e.carbs??null]);
+  return all.filter((e,i,a)=>a.findIndex(v=>key(v)===key(e))===i).sort((a,b)=>{
+    const score=e=>entries.filter(v=>v.name===e.name&&v.meal===meal).length*10+(e.meal===meal?100:0)+(state.favorites.some(v=>v.name===e.name)?5:0);
+    return score(b)-score(a);
+  }).slice(0,30);
+}
+export function currentMeal(hour=new Date().getHours()) { return hour<11?'Breakfast':hour<16?'Lunch':'Dinner'; }
+
 export const round = n => Math.round((n + Number.EPSILON) * 1000) / 1000;
 export function numeric(value, label = 'Amount', { min = 0, max = 1e7 } = {}) {
   if ((typeof value === 'string' && !value.trim()) || value === null || value === undefined || typeof value === 'boolean') throw new Error(`${label} is required.`);
@@ -27,36 +49,41 @@ export function dateObject(s) { const [y,m,d] = s.split('-').map(Number); return
 export function shiftDate(s,n) { const d = dateObject(s); d.setDate(d.getDate()+n); return localDate(d); }
 export function id() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 export function freshState(goal = 2000) {
-  return { schema:SCHEMA, revision:'', goal, onboarded:false, days:{}, batches:[], favorites:[], draft:null, preferences:{ theme:'system', vegetarian:false, reserve:0 } };
+  return { schema:SCHEMA, revision:'', goal, goals:{sodium:goal,protein:null,carbs:null}, primary:'sodium', onboarded:false, days:{}, batches:[], favorites:[], draft:null, preferences:{ theme:'system', vegetarian:false, reserve:0 } };
 }
-export function dayFor(state,date) { return state.days[date] || { goal:state.goal, entries:[], complete:false, plan:null }; }
-export function totalFor(day) { return day.entries.reduce((sum,e)=>sum+e.mg,0); }
-export function summary(day) {
-  const total=totalFor(day);
-  return { total, remaining:day.goal-total, estimated:day.entries.some(e=>e.estimate), count:day.entries.length, status:!day.entries.length?'empty':!day.complete?'progress':total<=day.goal?'within':'over' };
+export function dayFor(state,date) { return state.days[date] || { goal:state.goal, goals:{...state.goals}, entries:[], complete:false, plan:null }; }
+export function totalFor(day,key='sodium') { return round(day.entries.reduce((sum,e)=>sum+(nutrientValue(e,key)??0),0)); }
+export function summary(day,key='sodium') {
+  const total=totalFor(day,key), goal=key==='sodium'?(day.goals?.sodium??day.goal):(day.goals?.[key]??null);
+  const known=day.entries.filter(e=>nutrientValue(e,key)!==null).length,missing=day.entries.length-known;
+  const reached=goal!==null&&(key==='protein'?total>=goal:total<=goal);
+  const status=!day.entries.length?'empty':!day.complete?'progress':missing?'incomplete':goal===null?'logged':reached?'within':key==='protein'?'below':'over';
+  return {total,goal,remaining:goal===null?null:goal-total,estimated:day.entries.some(e=>e.estimate),count:day.entries.length,known,missing,reached,status};
 }
 export function labelAmount(perServing, amount, mode='servings', servingsPerContainer=1) {
   const base=numeric(perServing,'Sodium per serving'),qty=numeric(amount,'Amount eaten',{min:0.001});
   const multiplier=mode==='containers'?numeric(servingsPerContainer,'Servings per container',{min:0.001}):1;
   return round(base*qty*multiplier);
 }
-export function batchTotal(ingredients) {
+export function batchTotal(ingredients,key='sodium') {
   if (!ingredients.length) throw new Error('Add at least one ingredient.');
-  return round(ingredients.reduce((sum,i)=>sum+labelAmount(i.sodium,i.amount,i.mode,i.container),0));
+  const values=ingredients.map(i=>nutrientAmounts(i,i.amount,i.mode,i.container)[key==='sodium'?'mg':key]);
+  return values.some(v=>v===null)?null:round(values.reduce((sum,v)=>sum+v,0));
 }
 export function validateIngredients(ingredients) {
   if(!Array.isArray(ingredients)||ingredients.length>200)throw new Error('Invalid recipe ingredients.');
   return ingredients.map(i=>{
     if(!i||typeof i.name!=='string'||!i.name.trim()||i.name.length>250||!['servings','containers'].includes(i.mode))throw new Error('Invalid recipe ingredient.');
-    return {name:i.name,sodium:numeric(i.sodium),amount:numeric(i.amount,'Amount',{min:.001}),mode:i.mode,container:i.mode==='containers'?numeric(i.container,'Container servings',{min:.001}):1,estimate:Boolean(i.estimate)};
+    return {name:i.name,sodium:optionalNumber(i.sodium),protein:optionalNumber(i.protein),carbs:optionalNumber(i.carbs),amount:numeric(i.amount,'Amount',{min:.001}),mode:i.mode,container:i.mode==='containers'?numeric(i.container,'Container servings',{min:.001}):1,estimate:Boolean(i.estimate)};
   });
 }
-export function batchAmount(batch,portions) {
-  const qty=numeric(portions,'Your portions',{min:0.001});
-  const yieldCount=numeric(batch.yield,'Batch portions',{min:0.001});
+export function batchAmount(batch,portions,key='sodium') {
+  const qty=numeric(portions,'Your portions',{min:.001}),yieldCount=numeric(batch.yield,'Batch portions',{min:.001});
   if(qty>yieldCount)throw new Error('Your portion cannot exceed the whole batch.');
-  return round(batchTotal(batch.ingredients)/yieldCount*qty);
+  const total=batchTotal(batch.ingredients,key);
+  return total===null?null:round(total/yieldCount*qty);
 }
+export function batchNutrients(batch,portions=1) {return Object.fromEntries(nutrientKeys.map(k=>[k==='sodium'?'mg':k,batchAmount(batch,portions,k)]));}
 export function batchRemaining(state,batch) {
   const logged=Object.values(state.days).flatMap(d=>d.entries).filter(e=>e.batchId===batch.id).reduce((sum,e)=>sum+e.portions,0);
   return Math.max(0,round(batch.yield-logged));
@@ -64,7 +91,7 @@ export function batchRemaining(state,batch) {
 export function validateEntry(entry) {
   if(typeof entry.name!=='string'||!entry.name.trim()||entry.name.length>250)throw new Error('Give your food a name (up to 250 characters).');
   if(!MEALS.includes(entry.meal))throw new Error('Choose a meal.');
-  numeric(entry.mg,'Sodium');
+  nutrientKeys.forEach(k=>nutrientValue(entry,k));
   if(entry.batchId) numeric(entry.portions,'Batch portions',{min:0.001});
   return entry;
 }
@@ -72,7 +99,7 @@ export function addEntry(state,date,entry) {
   if(!validDate(date)||date>localDate())throw new Error('Choose today or an earlier date.');
   validateEntry(entry);
   const day=state.days[date] ||= dayFor(state,date);
-  day.entries.push({ ...entry, name:entry.name.trim(), mg:numeric(entry.mg,'Sodium'), ...(entry.batchId?{portions:numeric(entry.portions,'Batch portions',{min:.001})}:{}), id:entry.id||id(), createdAt:new Date().toISOString() });
+  day.entries.push({ ...entry, name:entry.name.trim(), ...nutrientAmounts(entry), ...(entry.batchId?{portions:numeric(entry.portions,'Batch portions',{min:.001})}:{}), id:entry.id||id(), createdAt:new Date().toISOString() });
   day.complete=false;
   return day;
 }
@@ -111,17 +138,17 @@ export function parseDescription(text) {
   return {name:name||'',sodium:Number(mg[1]),amount:total?1:whole?1:quantity?fraction(quantity):'',mode:whole?'containers':'servings',container:container?Number(container[1]):'',warnings};
 }
 export function validateBackup(data) {
-  if(!data||data.schema!==SCHEMA||!data.days||typeof data.days!=='object'||Array.isArray(data.days))throw new Error('This is not a compatible a little less backup.');
+  if(!data||![1,SCHEMA].includes(data.schema)||!data.days||typeof data.days!=='object'||Array.isArray(data.days))throw new Error('This is not a compatible a little less backup.');
   numeric(data.goal,'Daily limit',{min:1,max:100000});
   if(Object.keys(data.days).length>40000)throw new Error('This backup is too large.');
-  const clean=freshState(numeric(data.goal));clean.onboarded=Boolean(data.onboarded);
+  const clean=freshState(numeric(data.goal));clean.onboarded=Boolean(data.onboarded);clean.needsGoalSetup=data.schema===1||Boolean(data.needsGoalSetup);clean.primary=nutrientKeys.includes(data.primary)?data.primary:'sodium';clean.goals={sodium:clean.goal,protein:optionalNumber(data.goals?.protein),carbs:optionalNumber(data.goals?.carbs)};for(const value of Object.values(clean.goals))if(value!==null&&value<=0)throw new Error('Goals must be greater than zero.');
   for(const [date,day] of Object.entries(data.days)){
     if(!validDate(date)||!day||!Array.isArray(day.entries)||day.entries.length>5000)throw new Error('Invalid day in backup.');
     numeric(day.goal,'Saved daily limit',{min:1,max:100000});
-    const entries=day.entries.map(e=>{validateEntry(e);if(typeof e.id!=='string')throw new Error('Invalid food entry.');return {...e, mg:numeric(e.mg),...(e.batchId?{portions:numeric(e.portions)}:{}),estimate:Boolean(e.estimate)};});
+    const entries=day.entries.map(e=>{validateEntry(e);if(typeof e.id!=='string')throw new Error('Invalid food entry.');return {...e, ...nutrientAmounts(e),...(e.batchId?{portions:numeric(e.portions)}:{}),estimate:Boolean(e.estimate)};});
     if(new Set(entries.map(e=>e.id)).size!==entries.length)throw new Error('Duplicate food entries in backup.');
     let plan=null;if(day.plan){if(typeof day.plan.name!=='string')throw new Error('Invalid dinner plan.');numeric(day.plan.mg,'Plan sodium');plan={...day.plan};}
-    clean.days[date]={goal:Number(day.goal),entries,complete:Boolean(day.complete)&&entries.length>0,plan};
+    clean.days[date]={goal:Number(day.goal),goals:{sodium:Number(day.goal),protein:optionalNumber(day.goals?.protein),carbs:optionalNumber(day.goals?.carbs)},entries,complete:Boolean(day.complete)&&entries.length>0,plan};
   }
   if(!Array.isArray(data.batches)||!Array.isArray(data.favorites))throw new Error('Missing recipe data.');
   clean.batches=data.batches.map(b=>{if(!b||typeof b.id!=='string'||typeof b.name!=='string'||!b.name.trim()||!validDate(b.date))throw new Error('Invalid batch.');numeric(b.yield,'Batch portions',{min:.001});const ingredients=validateIngredients(b.ingredients);batchTotal(ingredients);return {...b,yield:numeric(b.yield),ingredients};});

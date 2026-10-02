@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "a little less — Sodium Tracker",
+  "name": "a little less — Nutrition Tracker",
   "short_name": "a little less",
-  "description": "A little clarity, one meal at a time. Your private sodium tracker.",
+  "description": "A little clarity, one meal at a time. Your private nutrition tracker.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
