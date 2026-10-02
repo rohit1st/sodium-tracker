@@ -1,4 +1,4 @@
-# a little less 🍊
+# Meal Tracker 🍊
 
 A mobile-first, local-first nutrition tracker in the approved tangerine and butter palette. Built with browser-native HTML, CSS and JavaScript; no npm dependencies or paid voice service.
 

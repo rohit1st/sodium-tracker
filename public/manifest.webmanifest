@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "a little less — Nutrition Tracker",
-  "short_name": "a little less",
+  "name": "Meal Tracker",
+  "short_name": "Meal Tracker",
   "description": "A little clarity, one meal at a time. Your private nutrition tracker.",
   "start_url": "./",
   "scope": "./",

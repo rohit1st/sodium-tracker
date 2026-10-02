@@ -138,7 +138,7 @@ export function parseDescription(text) {
   return {name:name||'',sodium:Number(mg[1]),amount:total?1:whole?1:quantity?fraction(quantity):'',mode:whole?'containers':'servings',container:container?Number(container[1]):'',warnings};
 }
 export function validateBackup(data) {
-  if(!data||![1,SCHEMA].includes(data.schema)||!data.days||typeof data.days!=='object'||Array.isArray(data.days))throw new Error('This is not a compatible a little less backup.');
+  if(!data||![1,SCHEMA].includes(data.schema)||!data.days||typeof data.days!=='object'||Array.isArray(data.days))throw new Error('This is not a compatible Meal Tracker backup.');
   numeric(data.goal,'Daily limit',{min:1,max:100000});
   if(Object.keys(data.days).length>40000)throw new Error('This backup is too large.');
   const clean=freshState(numeric(data.goal));clean.onboarded=Boolean(data.onboarded);clean.needsGoalSetup=data.schema===1||Boolean(data.needsGoalSetup);clean.primary=nutrientKeys.includes(data.primary)?data.primary:'sodium';clean.goals={sodium:clean.goal,protein:optionalNumber(data.goals?.protein),carbs:optionalNumber(data.goals?.carbs)};for(const value of Object.values(clean.goals))if(value!==null&&value<=0)throw new Error('Goals must be greater than zero.');
