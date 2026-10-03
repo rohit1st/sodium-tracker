@@ -1,4 +1,4 @@
-import { freshState, validateBackup, validateIngredients, id } from './core.js';
+import { freshState, validateBackup, validateIngredients, cleanEntryDrafts, id } from './core.js';
 const appPath=typeof location==='undefined'?'/':new URL('../',import.meta.url).pathname;
 export const STORAGE_KEY='a-little-less:v1'+(appPath==='/'?'':':'+appPath);
 export function loadState(storage=localStorage) {
@@ -8,6 +8,7 @@ export function loadState(storage=localStorage) {
   state.revision=typeof parsed.revision==='string'?parsed.revision:'';
   // A cooking draft is private to this device and not part of imported backups.
   if(parsed.draft)state.draft={...parsed.draft,name:String(parsed.draft.name||''),ingredients:validateIngredients(parsed.draft.ingredients)};
+  state.entryDrafts=cleanEntryDrafts(parsed.entryDrafts);
   return state;
 }
 export function writeState(next, previousRevision, storage=localStorage) {

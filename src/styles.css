@@ -28,3 +28,18 @@ dialog{border:1px solid var(--line);border-radius:26px;padding:0;background:var(
 body:has(dialog[open]) .toast{top:auto;bottom:18px}
 
 .goal-field > p{margin:6px 0 16px;line-height:1.45}
+
+/* Approved mobile refinements: comfortable targets and focused setup. */
+.tabs button[aria-pressed=true]{background:var(--surface);color:var(--accent)}
+.date-controls .icon-button,.ingredient-row .icon-button{width:44px;min-width:44px;min-height:44px}
+.goal-tabs button,.today-view .goal-tabs button{min-height:44px}
+.settings-heading{margin:24px 0 8px;font-size:16px;font-weight:600}
+.recovery-row{padding:16px 0;border-bottom:1px solid var(--line)}
+.field-error{display:block;color:var(--error);font-size:13px;margin-top:6px;font-weight:400}
+input[aria-invalid=true]{border:2px solid var(--error)}
+.incomplete-note{font-size:13px;margin:2px 0 0}.allowance>.text-button{color:inherit;padding:8px 0;min-height:44px}
+.focus-options{border:0;padding:0;margin:18px 0}.focus-options legend{font-size:14px;margin-bottom:8px}.focus-options label{display:flex;align-items:center;gap:12px;border:1px solid var(--line);padding:12px;border-radius:12px;margin:8px 0;background:var(--surface)}.focus-options label:has(input:checked){border-color:var(--accent);background:var(--soft)}.focus-options input{width:20px;height:20px;margin:0;accent-color:var(--accent)}.focus-options small{display:block;font-weight:400;margin-top:3px}
+.onboarding-main{padding-bottom:24px}.onboarding{max-width:410px;margin:auto}.onboarding>.brand-orange{margin:12px 0 20px;width:28px;height:28px}.onboarding h1{max-width:260px}.onboarding .primary{margin-bottom:12px}.onboarding .help{margin:14px 0}
+.toast{max-height:30dvh;overflow:auto}.toast .text-button{min-height:44px}
+::selection{background:var(--butter);color:var(--butter-ink)}input,textarea{caret-color:var(--accent)}
+@media(max-height:860px){.today-view .allowance{padding:13px 16px;margin-bottom:10px}.today-view .allowance-number{font-size:44px;margin:5px 0}.today-view .meal-group summary{min-height:44px;padding:10px 0}.today-view .day-end{min-height:68px;padding-top:6px}.today-view .meter{margin:10px 0 7px}}
