@@ -50,12 +50,12 @@ export function dateObject(s) { const [y,m,d] = s.split('-').map(Number); return
 export function shiftDate(s,n) { const d = dateObject(s); d.setDate(d.getDate()+n); return localDate(d); }
 export function id() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 export function freshState(goal = 2000) {
-  return { schema:SCHEMA, revision:'', goal, goals:{sodium:goal,protein:null,carbs:null}, primary:'sodium', onboarded:false, days:{}, batches:[], favorites:[], foods:structuredClone(STARTER_FOODS), draft:null, preferences:{ theme:'system', vegetarian:false, reserve:0 } };
+  return { schema:SCHEMA, revision:'', goal, goals:{sodium:goal,protein:null,carbs:null}, primary:'sodium', onboarded:false, days:{}, batches:[], favorites:[], foods:structuredClone(STARTER_FOODS), draft:null, entryDrafts:{}, deletedEntries:[], preferences:{ theme:'system', vegetarian:false, reserve:0 } };
 }
 export function dayFor(state,date) { return state.days[date] || { goal:state.goal, goals:{...state.goals}, entries:[], complete:false, plan:null }; }
 export function totalFor(day,key='sodium') { return round(day.entries.reduce((sum,e)=>sum+(nutrientValue(e,key)??0),0)); }
 export function summary(day,key='sodium') {
-  const total=totalFor(day,key), goal=key==='sodium'?(day.goals?.sodium??day.goal):(day.goals?.[key]??null);
+  const total=totalFor(day,key), goal=key==='sodium'?(day.goals&&Object.hasOwn(day.goals,'sodium')?day.goals.sodium:day.goal):(day.goals?.[key]??null);
   const known=day.entries.filter(e=>nutrientValue(e,key)!==null).length,missing=day.entries.length-known;
   const reached=goal!==null&&(key==='protein'?total>=goal:total<=goal);
   const status=!day.entries.length?'empty':!day.complete?'progress':missing?'incomplete':goal===null?'logged':reached?'within':key==='protein'?'below':'over';
@@ -142,19 +142,24 @@ export function validateBackup(data) {
   if(!data||![1,SCHEMA].includes(data.schema)||!data.days||typeof data.days!=='object'||Array.isArray(data.days))throw new Error('This is not a compatible Meal Tracker backup.');
   numeric(data.goal,'Daily limit',{min:1,max:100000});
   if(Object.keys(data.days).length>40000)throw new Error('This backup is too large.');
-  const clean=freshState(numeric(data.goal));clean.onboarded=Boolean(data.onboarded);clean.needsGoalSetup=data.schema===1||Boolean(data.needsGoalSetup);clean.primary=nutrientKeys.includes(data.primary)?data.primary:'sodium';clean.goals={sodium:clean.goal,protein:optionalNumber(data.goals?.protein),carbs:optionalNumber(data.goals?.carbs)};for(const value of Object.values(clean.goals))if(value!==null&&value<=0)throw new Error('Goals must be greater than zero.');
+  const clean=freshState(numeric(data.goal));clean.onboarded=Boolean(data.onboarded);clean.needsGoalSetup=data.schema===1||Boolean(data.needsGoalSetup);clean.primary=nutrientKeys.includes(data.primary)?data.primary:'sodium';clean.goals={sodium:data.goals&&Object.hasOwn(data.goals,'sodium')?optionalNumber(data.goals.sodium):clean.goal,protein:optionalNumber(data.goals?.protein),carbs:optionalNumber(data.goals?.carbs)};for(const value of Object.values(clean.goals))if(value!==null&&value<=0)throw new Error('Goals must be greater than zero.');
   for(const [date,day] of Object.entries(data.days)){
     if(!validDate(date)||!day||!Array.isArray(day.entries)||day.entries.length>5000)throw new Error('Invalid day in backup.');
     numeric(day.goal,'Saved daily limit',{min:1,max:100000});
     const entries=day.entries.map(e=>{validateEntry(e);if(typeof e.id!=='string')throw new Error('Invalid food entry.');return {...e, ...nutrientAmounts(e),...(e.batchId?{portions:numeric(e.portions)}:{}),estimate:Boolean(e.estimate)};});
     if(new Set(entries.map(e=>e.id)).size!==entries.length)throw new Error('Duplicate food entries in backup.');
     let plan=null;if(day.plan){if(typeof day.plan.name!=='string')throw new Error('Invalid dinner plan.');numeric(day.plan.mg,'Plan sodium');plan={...day.plan};}
-    clean.days[date]={goal:Number(day.goal),goals:{sodium:Number(day.goal),protein:optionalNumber(day.goals?.protein),carbs:optionalNumber(day.goals?.carbs)},entries,complete:Boolean(day.complete)&&entries.length>0,plan};
+    clean.days[date]={goal:Number(day.goal),goals:{sodium:day.goals&&Object.hasOwn(day.goals,'sodium')?optionalNumber(day.goals.sodium):Number(day.goal),protein:optionalNumber(day.goals?.protein),carbs:optionalNumber(day.goals?.carbs)},entries,complete:Boolean(day.complete)&&entries.length>0,plan};
   }
   if(!Array.isArray(data.batches)||!Array.isArray(data.favorites))throw new Error('Missing recipe data.');
   clean.batches=data.batches.map(b=>{if(!b||typeof b.id!=='string'||typeof b.name!=='string'||!b.name.trim()||!validDate(b.date))throw new Error('Invalid batch.');numeric(b.yield,'Batch portions',{min:.001});const ingredients=validateIngredients(b.ingredients);batchTotal(ingredients);return {...b,yield:numeric(b.yield),ingredients};});
   clean.favorites=data.favorites.map(e=>{validateEntry(e);return {...e};});
   clean.foods=data.foods===undefined?mergeFoods(structuredClone(STARTER_FOODS),clean.favorites.map(foodFromEntry)).foods:validateFoods(data.foods);
+  if(data.deletedEntries!==undefined){
+    if(!Array.isArray(data.deletedEntries)||data.deletedEntries.length>5000)throw new Error('Invalid recovery history.');
+    clean.deletedEntries=data.deletedEntries.map(x=>{if(!x||typeof x.id!=='string'||!validDate(x.date)||!Number.isFinite(x.deletedAt)||x.deletedAt<0||typeof x.entry?.id!=='string')throw new Error('Invalid deleted entry.');validateEntry(x.entry);return {id:x.id,date:x.date,deletedAt:x.deletedAt,entry:{...x.entry,...nutrientAmounts(x.entry)}};});
+    clean.deletedEntries=recentDeletions(clean);
+  }
   clean.draft=null;clean.preferences={...clean.preferences,...data.preferences};
   if(!['system','light','dark'].includes(clean.preferences.theme))clean.preferences.theme='system';
   clean.preferences.reserve=numeric(clean.preferences.reserve,'Reserve',{max:100000});
@@ -195,4 +200,30 @@ export function mergeFoods(existing,incoming){
   for(const item of incoming){const food=cleanFood(item),key=foodKey(food);if(keys.has(key)){skipped++;continue;}keys.add(key);foods.push({...food,id:id()});added++;}
   if(foods.length>1000)throw new Error('The merged library would exceed 1,000 foods.');
   return {foods,added,skipped};
+}
+
+export const RECOVERY_DAYS=7;
+export function recentDeletions(state,now=Date.now()) {return (state.deletedEntries||[]).filter(x=>now-x.deletedAt<RECOVERY_DAYS*86400000&&x.deletedAt<=now);}
+export function removeEntry(state,date,entryId,now=Date.now()) {
+  const day=state.days[date],entry=day?.entries.find(e=>e.id===entryId);
+  if(!entry)throw new Error('That entry is no longer in your log.');
+  state.deletedEntries=[...recentDeletions(state,now),{id:id(),date,entry:structuredClone(entry),deletedAt:now}];
+  day.entries=day.entries.filter(e=>e.id!==entryId);day.complete=false;
+}
+export function restoreEntry(state,deletionId,now=Date.now()) {
+  const deleted=recentDeletions(state,now).find(e=>e.id===deletionId);
+  if(!deleted)throw new Error('This entry is no longer available to restore.');
+  const entry=deleted.entry;
+  if(Object.values(state.days).some(d=>d.entries.some(e=>e.id===entry.id)))throw new Error('This entry is already in your log.');
+  if(entry.batchId){const batch=state.batches.find(b=>b.id===entry.batchId);if(!batch||batchRemaining(state,batch)<entry.portions)throw new Error('Not enough batch portions remain. Adjust the other logged portions before restoring.');}
+  (state.days[deleted.date] ||= dayFor(state,deleted.date)).entries.push(structuredClone(entry));
+  state.days[deleted.date].complete=false;
+  state.deletedEntries=recentDeletions(state,now).filter(x=>x.id!==deletionId);
+}
+export function cleanEntryDrafts(value={}) {
+  const clean={};
+  for(const category of ['out','label','home']){const draft=value?.[category];if(!draft||typeof draft!=='object')continue;clean[category]={};
+    for(const key of ['name','sodium','protein','carbs','amount','mode','container','meal','template'])if(typeof draft[key]==='string'&&draft[key].length<=1000)clean[category][key]=draft[key];
+    for(const key of ['estimate','published','favorite'])clean[category][key]=Boolean(draft[key]);
+  }return clean;
 }

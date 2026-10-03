@@ -83,3 +83,12 @@ Food-list JSON exports have `type: "meal-tracker-food-list"`, `version: 1`, fixe
 Import previews a merge, skipping matches by case-insensitive name/portion and nutrient amounts. Different portions or nutrition remain separate. Imports never overwrite logs or goals. Up to 1,000 foods and 2 MB per file; malformed lists reject as a whole. Full personal backups are a separate format and include the library along with private tracking data.
 
 New-user onboarding prefills editable FDA label Daily Values (2,300 mg sodium, 50 g protein, 275 g carbohydrate), clearly identified as general label references. Inline guidance distinguishes the sodium ceiling, 2025–2030 weight-based protein range, and calorie-based adult carbohydrate range. Saved goals and historical logs are not changed; references are also available in goal settings.
+
+## Mobile UX refinements (2.3)
+
+- Incomplete nutrient totals show known intake prominently and link directly to missing entries; dinner suggestions do not promise that they fit an incomplete allowance.
+- First-run setup starts with one primary goal. Other goals are expandable and optional, including sodium. General reference guidance stays available. The install invitation follows the first food log.
+- Home Add always opens Regulars. Personal usuals and starter foods are grouped separately. Settings groups Goals, App, and Your data. Library navigation returns to the entry flow.
+- Packaged, home-cooked direct entry, and restaurant drafts are stored separately on this device. Switching categories, navigating or reconnecting does not reset them. Successful logging clears only that category's draft. Existing ingredient-based cooking, carton math, yields and leftovers remain intact.
+- Deleted food entries can be restored from Settings → Recent deletions for seven days. Restoration preserves the original date and cannot over-allocate a cooking batch. Reset and backup replacement clear recovery history. Recovery records are private backup data and never appear in food-list exports.
+- Quick Undo stays visible until dismissed, replaced or invalidated by another edit. Draft edits invalidate snapshot Undo so later work cannot be overwritten. Per-field quantity errors and enlarged touch targets improve mobile recovery.
